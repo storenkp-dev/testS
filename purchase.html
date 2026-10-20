@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>รายการจัดซื้อ</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+    <script src="data.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .sec-head { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 8px 0; flex-wrap: wrap; gap: 10px; }
+        .sec-head h2 { margin: 0; color: #2c3e50; font-size: 18px; }
+        .btn-clear-mat { padding: 5px 15px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-clear-mat:hover { background: #c0392b; }
+        .sel-chip { background: #d5f5e3; color: #1e8449; border: 1px solid #a9dfbf; padding: 3px 10px; border-radius: 14px; font-size: 12px; font-weight: bold; display: none; }
+        #sumBody tr { cursor: pointer; }
+        #sumBody tr:hover { background-color: #e8f4f8; }
+        #sumBody tr.selected { background-color: #d5f5e3; }
+        #sumFoot td { background: #f4f6f7; font-weight: bold; border-top: 2px solid #2c3e50; }
+        .tag-pr { background: #fdebd0; color: #a04000; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+        .tag-po { background: #d6eaf8; color: #1b4f72; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="index.html" class="nav-btn btn-graph">📊 หน้ากราฟ</a>
+        <a href="demand.html" class="nav-btn btn-demand">📋 ตารางความต้องการ</a>
+        <a href="concrete.html" class="nav-btn btn-concrete">🏗️ ผลิตภัณฑ์คอนกรีต</a>
+        <a href="mb52.html" class="nav-btn btn-mb52">🏬 คงคลัง MB52</a>
+        <a href="me2n.html" class="nav-btn btn-me2n">📦 วัสดุรอนำเข้า (ME2N)</a>
+        <a href="plan1.html" class="nav-btn btn-plan">🛒 แผนซื้อ กฟฉ.1</a>
+        <a href="allocate.html" class="nav-btn btn-alloc">🚚 จัดสรรให้คลังต่างๆ</a>
+        <a href="budget.html" class="nav-btn btn-budget">💰 งบเงิน</a>
+        <a href="purchase.html" class="nav-btn btn-purchase">🛒 รายการจัดซื้อ</a>
+        <div class="update-box">
+            🕒 อัปเดตล่าสุด: <span id="lastUpdatedText">กำลังอัปเดต...</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 style="margin-top: 0; margin-bottom: 20px; color: #2c3e50; display: flex; align-items: center; gap: 10px;">
+            🛒 รายการจัดซื้อ (รอรับของ)
+        </h2>
+
+        <div class="filter-group">
+            <div>
+                <label style="font-weight:bold; color:#34495e;">🔍 ประเภท: </label>
+                <select id="categoryFilter" onchange="selectedMat=null; renderTable()">
+                    <option value="ALL">รวมทั้งหมด</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-weight:bold; color:#34495e;">🔍 กรอง WBS: </label>
+                <select id="wbsFilter" onchange="selectedMat=null; renderTable()">
+                    <option value="ALL">✅ รวมทั้งหมดทุก WBS</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-weight:bold; color:#34495e;">📄 เลขเอกสาร: </label>
+                <input type="text" id="docFilter" onkeyup="selectedMat=null; renderTable()" placeholder="พิมพ์เลข PR หรือ PO...">
+            </div>
+        </div>
+
+        <div class="summary-container">
+            <div class="summary-card card-pr">
+                <div class="summary-title">📝 เอกสาร PR ทั้งหมด</div>
+                <div class="summary-value"><span id="prCount">0</span> ชุด</div>
+                <div class="summary-sub">มูลค่ารวม: ฿ <span id="prAmount">0.00</span></div>
+            </div>
+            <div class="summary-card card-po">
+                <div class="summary-title">📑 เอกสาร PO ทั้งหมด</div>
+                <div class="summary-value"><span id="poCount">0</span> ชุด</div>
+                <div class="summary-sub-po">มูลค่ารวม: ฿ <span id="poAmount">0.00</span></div>
+            </div>
+            <div class="summary-card card-total">
+                <div class="summary-title">💵 ยอดเงินรวมทั้งสิ้น</div>
+                <div class="summary-value" style="color:#c0392b; font-size: 24px;">฿ <span id="totalAmount">0.00</span></div>
+            </div>
+        </div>
+
+        <!-- ตารางที่ 1 : สรุปรวมรายการที่ซื้อ (แยกตามวัสดุ) -->
+        <div class="sec-head">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <h2>1. สรุปรวมรายการที่ซื้อ (คลิกรหัสวัสดุเพื่อกรองตารางที่ 2)</h2>
+                <span class="sel-chip" id="selChip"></span>
+            </div>
+            <div style="display:flex; gap:8px;"><button onclick="exportSum()" style="padding: 5px 15px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📥 Export Excel (.xlsx)</button><button class="btn-clear-mat" onclick="selectedMat=null; renderTable()">ล้างการเลือกวัสดุ</button></div>
+        </div>
+        <div class="table-wrapper" style="max-height: 320px;">
+            <table>
+                <thead style="background-color: #2c3e50;">
+                    <tr>
+                        <th style="color:white; min-width:130px;">รหัสวัสดุ (คลิกเพื่อกรอง)</th>
+                        <th style="color:white; min-width:280px;">ชื่ออุปกรณ์</th>
+                        <th style="color:white; text-align:right;">จำนวน PR</th>
+                        <th style="color:white; text-align:right;">จำนวน PO</th>
+                        <th style="color:white; text-align:right;">ยอดรวม</th>
+                        <th style="color:white; text-align:center;">จำนวนเอกสาร</th>
+                        <th style="color:white; text-align:right;">มูลค่า (฿)</th>
+                        <th style="color:white; text-align:center;">เลยกำหนด</th>
+                    </tr>
+                </thead>
+                <tbody id="sumBody"></tbody>
+                <tfoot id="sumFoot"></tfoot>
+            </table>
+        </div>
+
+        <!-- ตารางที่ 2 : รายละเอียดเอกสาร -->
+        <div class="sec-head">
+            <h2>2. รายละเอียดเอกสารการจัดซื้อ (PR / PO)</h2>
+            <button onclick="exportDet()" style="padding: 5px 15px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📥 Export Excel (.xlsx)</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="min-width: 220px;">บริษัท (ผู้ขาย)</th>
+                        <th style="min-width: 140px;">เลขเอกสาร</th>
+                        <th style="min-width: 130px;">วัสดุ</th>
+                        <th style="min-width: 300px;">คำอธิบายวัสดุ</th>
+                        <th>จำนวน</th>
+                        <th style="min-width: 120px;">วันที่ทำสัญญา PO</th>
+                        <th style="min-width: 130px;">วันครบกำหนด</th>
+                        <th>สถานะจัดส่ง</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+    let selectedMat = null; // วัสดุที่คลิกเลือกจากตารางที่ 1
+    let exportSumRows = [], exportDetRows = [];
+
+    // ประเภทวัสดุ: ใช้ค่า Category จาก data.js (run.py) ถ้าไม่มีให้หาจาก mainData
+    const _catByMat = {};
+    if (typeof mainData !== 'undefined') mainData.forEach(m => { _catByMat[m['วัสดุ']] = m.Category; });
+    const catOf = r => r.Category || _catByMat[r.Mat] || 'วัสดุอื่นๆ';
+
+    const fmtQty = n => (Number(n) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    const fmtMoney = n => (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    function init() {
+        if (typeof lastUpdated !== 'undefined') document.getElementById('lastUpdatedText').innerText = lastUpdated;
+
+        if (typeof purchaseData === 'undefined' || purchaseData.length === 0) {
+            document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" style="text-align:center; color:red; padding: 30px;">ไม่พบข้อมูลรายการจัดซื้อ หรือกำลังรอประมวลผล...</td></tr>';
+            document.getElementById('sumBody').innerHTML = '<tr><td colspan="8" style="text-align:center; color:red; padding: 30px;">ไม่พบข้อมูลรายการจัดซื้อ หรือกำลังรอประมวลผล...</td></tr>';
+            return;
+        }
+
+        const catSelect = document.getElementById('categoryFilter');
+        [...new Set(purchaseData.map(catOf))].sort().forEach(c => catSelect.appendChild(new Option(c, c)));
+
+        const uniqueWBS = [...new Set(purchaseData.map(i => i.WBS))].sort();
+        const wbsSelect = document.getElementById('wbsFilter');
+        uniqueWBS.forEach(w => wbsSelect.appendChild(new Option(w, w)));
+
+        renderTable();
+    }
+
+    function copyDocNum(text, element) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalIcon = element.innerText;
+            element.innerText = '✅';
+            element.style.opacity = '1';
+            element.style.color = '#27ae60';
+
+            setTimeout(() => {
+                element.innerText = originalIcon;
+                element.style.opacity = '0.4';
+                element.style.color = 'inherit';
+            }, 1500);
+        }).catch(err => {
+            alert("ไม่สามารถคัดลอกได้อัตโนมัติ กรุณากด Ctrl+C แทนครับ");
+        });
+    }
+
+    // ข้อความ popup เมื่อเอาเมาส์ชี้เลขเอกสาร: แสดง Contract No (เช่น 67D06MM014)
+    function contractTip(r) {
+        const c = String(r.Contract || '').trim().toUpperCase();
+        return c ? 'Contract No: ' + c : 'Contract No: - (ไม่มีข้อมูล)';
+    }
+
+    function selectMat(mat) {
+        selectedMat = (selectedMat === mat) ? null : mat; // คลิกซ้ำเพื่อยกเลิก
+        renderTable();
+    }
+
+    function renderTable() {
+        const selectedWBS = document.getElementById('wbsFilter').value;
+        const searchDoc = document.getElementById('docFilter').value.trim().toLowerCase();
+        const selectedCat = document.getElementById('categoryFilter').value;
+
+        // กรองตาม ประเภท / WBS / เลขเอกสาร (ใช้กับทั้งตารางที่ 1 และ 2)
+        let base = purchaseData;
+        if (selectedCat !== 'ALL') base = base.filter(r => catOf(r) === selectedCat);
+        if (selectedWBS !== 'ALL') base = base.filter(r => r.WBS === selectedWBS);
+        if (searchDoc !== '') base = base.filter(r => String(r.DocNum).toLowerCase().includes(searchDoc));
+
+        // ---------- ตารางที่ 1 : สรุปตามวัสดุ ----------
+        const sum = {};
+        base.forEach(r => {
+            const s = sum[r.Mat] = sum[r.Mat] || { mat: r.Mat, desc: r.Desc, pr: 0, po: 0, docs: new Set(), amount: 0, overdue: new Set() };
+            if (r.DocType === 'PR') s.pr += r.Qty; else if (r.DocType === 'PO') s.po += r.Qty;
+            s.docs.add(r.DocNum);
+            s.amount += r.Amount || 0;
+            if (typeof r.OverdueDays === 'number' && r.OverdueDays > 0) s.overdue.add(r.DocNum);
+        });
+
+        if (selectedMat && !sum[selectedMat]) selectedMat = null; // วัสดุที่เลือกไม่อยู่ในผลกรองแล้ว
+
+        let hSum = '';
+        let tDocs = new Set(), tAmount = 0, tOver = new Set();
+        Object.values(sum).sort((a, b) => String(a.mat).localeCompare(String(b.mat))).forEach(s => {
+            s.docs.forEach(d => tDocs.add(d)); s.overdue.forEach(d => tOver.add(d));
+            tAmount += s.amount;
+            hSum += `<tr class="${selectedMat === s.mat ? 'selected' : ''}" onclick="selectMat('${s.mat}')">
+                <td class="wbs-link"><b>${s.mat}</b></td>
+                <td>${s.desc}</td>
+                <td class="num-col">${s.pr ? `<span class="tag-pr">PR</span> <b>${fmtQty(s.pr)}</b>` : '-'}</td>
+                <td class="num-col">${s.po ? `<span class="tag-po">PO</span> <b>${fmtQty(s.po)}</b>` : '-'}</td>
+                <td class="num-col" style="color:#27ae60;"><b>${fmtQty(s.pr + s.po)}</b></td>
+                <td style="text-align:center;">${s.docs.size}</td>
+                <td class="num-col" style="color:#c0392b;"><b>${fmtMoney(s.amount)}</b></td>
+                <td style="text-align:center;">${s.overdue.size ? `<span class="overdue">${s.overdue.size} เอกสาร</span>` : '-'}</td>
+            </tr>`;
+        });
+        exportSumRows = Object.values(sum).sort((a, b) => String(a.mat).localeCompare(String(b.mat)))
+            .map(s => [s.mat, s.desc, s.pr || 0, s.po || 0, s.pr + s.po, s.docs.size, s.amount, s.overdue.size]);
+        document.getElementById('sumBody').innerHTML = hSum || '<tr><td colspan="8" style="text-align:center; padding: 20px;">ไม่มีข้อมูลที่ตรงกับเงื่อนไข</td></tr>';
+        document.getElementById('sumFoot').innerHTML = hSum ? `<tr>
+            <td colspan="2" style="text-align:right;">รวม ${Object.keys(sum).length} รายการวัสดุ</td>
+            <td></td><td></td><td></td>
+            <td style="text-align:center;">${tDocs.size}</td>
+            <td class="num-col" style="color:#c0392b;">${fmtMoney(tAmount)}</td>
+            <td style="text-align:center;">${tOver.size ? tOver.size + ' เอกสาร' : '-'}</td>
+        </tr>` : '';
+
+        const chip = document.getElementById('selChip');
+        if (selectedMat) { chip.style.display = 'inline-block'; chip.innerText = '🔎 กำลังกรองวัสดุ: ' + selectedMat; }
+        else chip.style.display = 'none';
+
+        // ---------- ตารางที่ 2 : รายละเอียด ----------
+        let fd = base;
+        if (selectedMat) fd = fd.filter(r => r.Mat === selectedMat);
+
+        let h = '';
+        let uniquePRs = new Set();
+        let uniquePOs = new Set();
+        let sumPRAmount = 0;
+        let sumPOAmount = 0;
+
+        fd.forEach(r => {
+            if (r.DocType === 'PR') { uniquePRs.add(r.DocNum); sumPRAmount += r.Amount; }
+            else if (r.DocType === 'PO') { uniquePOs.add(r.DocNum); sumPOAmount += r.Amount; }
+
+            let overdueText = r.OverdueDays;
+            if (typeof overdueText === 'number' && overdueText > 0) {
+                overdueText = `<span class="overdue">เกินกำหนด ${overdueText} วัน</span>`;
+            } else if (overdueText === 0) {
+                overdueText = `<span style="color:#27ae60; font-weight:bold;">ยังไม่ถึงกำหนด</span>`;
+            } else {
+                overdueText = '-'; // สำหรับ PR หรืออันที่หาวันที่ใน 13.ME2N1.xlsx ไม่เจอ
+            }
+
+            h += `<tr>
+                <td><b>${r.Company}</b></td>
+                <td style="text-align:center; font-weight:bold; color:#2c3e50;" title="${contractTip(r)}">
+                    ${r.DocNum}
+                    <span class="copy-btn" onclick="copyDocNum('${r.DocNum}', this)" title="คัดลอกเลขเอกสาร">📋</span>
+                </td>
+                <td style="text-align:center; color:#555;">${r.Mat}</td>
+                <td>${r.Desc}</td>
+                <td class="num-col"><b>${r.Qty.toLocaleString()}</b></td>
+                <td style="text-align:center;">${r.PoDate}</td>
+                <td style="text-align:center; font-weight:bold; color:#d35400;">${r.DueDate}</td>
+                <td style="text-align:center;">${overdueText}</td>
+            </tr>`;
+        });
+
+        exportDetRows = fd.map(r => [
+            r.WBS, r.DocType, r.DocNum, String(r.Contract || '').toUpperCase(), r.Company, catOf(r), r.Mat, r.Desc, r.Qty, r.Amount || 0,
+            r.PoDate, r.DueDate,
+            (typeof r.OverdueDays === 'number') ? (r.OverdueDays > 0 ? 'เกินกำหนด ' + r.OverdueDays + ' วัน' : 'ยังไม่ถึงกำหนด') : '-'
+        ]);
+        document.getElementById('tableBody').innerHTML = h || '<tr><td colspan="8" style="text-align:center; padding: 20px;">ไม่มีข้อมูลที่ตรงกับเงื่อนไข</td></tr>';
+
+        document.getElementById('prCount').innerText = uniquePRs.size;
+        document.getElementById('prAmount').innerText = fmtMoney(sumPRAmount);
+
+        document.getElementById('poCount').innerText = uniquePOs.size;
+        document.getElementById('poAmount').innerText = fmtMoney(sumPOAmount);
+
+        document.getElementById('totalAmount').innerText = fmtMoney(sumPRAmount + sumPOAmount);
+    }
+
+    // ---------- Export Excel ----------
+    function filterInfo() {
+        const sel = id => { const e = document.getElementById(id); return e.value === 'ALL' ? 'ทั้งหมด' : e.options[e.selectedIndex].text; };
+        const doc = document.getElementById('docFilter').value.trim();
+        return 'ประเภท: ' + sel('categoryFilter') + ' | WBS: ' + sel('wbsFilter') + (doc ? ' | เลขเอกสาร: ' + doc : '') + (selectedMat ? ' | วัสดุที่เลือก: ' + selectedMat : '');
+    }
+    function exportAoa(aoa, widths, sheet, prefix) {
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = widths.map(w => ({ wch: w }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheet);
+        XLSX.writeFile(wb, prefix + '_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+    }
+    function exportSum() {
+        const upd = 'อัปเดตข้อมูล: ' + (typeof lastUpdated !== 'undefined' ? lastUpdated : '-');
+        const info = filterInfo().replace(/ \| วัสดุที่เลือก: .*$/, '');
+        const tot = exportSumRows.reduce((a, r) => a + r[6], 0);
+        exportAoa([
+            ['รายการจัดซื้อ : สรุปรวมรายการที่ซื้อ (ตารางที่ 1)'],
+            [info, '', '', '', '', '', upd],
+            [],
+            ['รหัสวัสดุ', 'ชื่ออุปกรณ์', 'จำนวน PR', 'จำนวน PO', 'ยอดรวม', 'จำนวนเอกสาร', 'มูลค่า (฿)', 'เลยกำหนด (เอกสาร)'],
+            ...exportSumRows,
+            ['', 'รวม ' + exportSumRows.length + ' รายการวัสดุ', '', '', '', '', tot, '']
+        ], [18, 50, 12, 12, 12, 14, 16, 18], 'สรุป', 'Purchase_Summary');
+    }
+    function exportDet() {
+        const upd = 'อัปเดตข้อมูล: ' + (typeof lastUpdated !== 'undefined' ? lastUpdated : '-');
+        const tot = exportDetRows.reduce((a, r) => a + r[9], 0);
+        exportAoa([
+            ['รายการจัดซื้อ : รายละเอียดเอกสาร PR / PO (ตารางที่ 2)'],
+            [filterInfo(), '', '', '', '', '', '', '', '', '', '', upd],
+            [],
+            ['WBS', 'ประเภทเอกสาร', 'เลขเอกสาร', 'Contract No', 'บริษัท (ผู้ขาย)', 'ประเภทวัสดุ', 'วัสดุ', 'คำอธิบายวัสดุ', 'จำนวน', 'มูลค่า (฿)', 'วันที่ทำสัญญา PO', 'วันครบกำหนด', 'สถานะจัดส่ง'],
+            ...exportDetRows,
+            ['', '', '', '', '', '', '', 'รวม ' + exportDetRows.length + ' รายการ', '', tot, '', '', '']
+        ], [26, 12, 14, 16, 36, 14, 16, 45, 12, 16, 16, 14, 20], 'รายละเอียด', 'Purchase_Detail');
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>งบเงิน</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="data.js"></script>
+</head>
+<body>
+    <div class="navbar">
+        <a href="index.html" class="nav-btn btn-graph">📊 หน้ากราฟ</a>
+        <a href="demand.html" class="nav-btn btn-demand">📋 ตารางความต้องการ</a>
+        <a href="concrete.html" class="nav-btn btn-concrete">🏗️ ผลิตภัณฑ์คอนกรีต</a>
+        <a href="mb52.html" class="nav-btn btn-mb52">🏬 คงคลัง MB52</a>
+        <a href="me2n.html" class="nav-btn btn-me2n">📦 วัสดุรอนำเข้า (ME2N)</a>
+        <a href="plan1.html" class="nav-btn btn-plan">🛒 แผนซื้อ กฟฉ.1</a>
+        <a href="allocate.html" class="nav-btn btn-alloc">🚚 จัดสรรให้คลังต่างๆ</a>
+        <a href="budget.html" class="nav-btn btn-budget">💰 งบเงิน</a>
+        <a href="purchase.html" class="nav-btn btn-purchase">🛒 รายการจัดซื้อ</a>
+        <div class="update-box">
+            🕒 อัปเดตล่าสุด: <span id="lastUpdatedText">กำลังอัปเดต...</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 style="margin-top: 0; margin-bottom: 20px; color: #2c3e50;">
+            💰 รายการวงเงินงบประมาณ (NPN ทั้งหมด, และ AED/POP เฉพาะงบ C)
+        </h2>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">WBS / ชื่องบ</th>
+                        <th>วงเงินคงเหลือยกมา<br>(3)</th>
+                        <th>จ่ายจริงสะสม<br>(4)</th>
+                        <th>วงเงินคงเหลือ<br>(5)=(3)-(4)</th>
+                        <th>IR<br>(6)</th>
+                        <th>GR<br>(7)</th>
+                        <th>วงเงินผูกพันใน SAP<br>(8)</th>
+                        <th>PO<br>(9)</th>
+                        <th>PR<br>(10)</th>
+                        <th style="background-color: #e74c3c;">ยังไม่ดำเนินการ<br>(11)</th>
+                    </tr>
+                </thead>
+                <tbody id="budgetBody"></tbody>
+                <tfoot>
+                    <tr>
+                        <th style="text-align: center;">รวมทั้งสิ้น</th>
+                        <th id="sum3">0.00</th>
+                        <th id="sum4">0.00</th>
+                        <th id="sum5">0.00</th>
+                        <th id="sum6">0.00</th>
+                        <th id="sum7">0.00</th>
+                        <th id="sum8">0.00</th>
+                        <th id="sum9">0.00</th>
+                        <th id="sum10">0.00</th>
+                        <th id="sum11" style="color: #ffffff; background-color:#c0392b;">0.00</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+<script>
+    function init() {
+        if (typeof lastUpdated !== 'undefined') document.getElementById('lastUpdatedText').innerText = lastUpdated;
+        
+        if (typeof budgetData === 'undefined' || budgetData.length === 0) {
+            document.getElementById('budgetBody').innerHTML = '<tr><td colspan="10" style="text-align:center; color:red; padding: 20px;">ไม่พบข้อมูล หรือกำลังรอ GitHub ประมวลผล...</td></tr>';
+            return;
+        }
+
+        let h = '';
+        let sums = { 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0, 11:0 };
+
+        budgetData.forEach(r => {
+            sums[3] += r.Col3; sums[4] += r.Col4; sums[5] += r.Col5;
+            sums[6] += r.Col6; sums[7] += r.Col7; sums[8] += r.Col8;
+            sums[9] += r.Col9; sums[10] += r.Col10; sums[11] += r.Col11;
+
+            let projNameHtml = r.Project_Name !== '-' ? `<br><span style="font-size: 12px; color: #7f8c8d; font-weight: normal;">${r.Project_Name}</span>` : '';
+
+            h += `<tr>
+                <td><b>${r.WBS}</b>${projNameHtml}</td>
+                <td class="num-col">${r.Col3.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="num-col">${r.Col4.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="num-col" style="color:#2980b9; font-weight:bold;">${r.Col5.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="num-col">${r.Col6.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="num-col">${r.Col7.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="num-col">${r.Col8.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="num-col">${r.Col9.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="num-col">${r.Col10.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="num-col" style="color:#e74c3c; font-weight:bold;">${r.Col11.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>`;
+        });
+
+        document.getElementById('budgetBody').innerHTML = h;
+
+        for(let i=3; i<=11; i++) {
+            document.getElementById(`sum${i}`).innerText = sums[i].toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
