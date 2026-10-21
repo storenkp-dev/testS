@@ -102,7 +102,7 @@ tr.mat-band td { background: #f7e6c8; font-weight: bold; border-top: 2px solid #
     </div>
     <div>
       <label>🏷️ ประเภท</label>
-      <select id="categoryFilter" onchange="render()"><option value="ALL">✅ ทุกประเภท</option></select>
+      <select id="categoryFilter" onchange="applyFilters()"><option value="ALL">✅ ทุกประเภท</option></select>
     </div>
     <div>
       <label>📍 ที่เก็บสินค้า</label>
@@ -113,14 +113,14 @@ tr.mat-band td { background: #f7e6c8; font-weight: bold; border-top: 2px solid #
     </div>
     <div>
       <label>🔍 รหัสพัสดุ / ชื่อ</label>
-      <input type="text" id="matSearch" oninput="selectedMat = null; render()" placeholder="เช่น 1-00-001-0001 หรือ 1000010001 (คั่นหลายรายการด้วย ,)">
+      <input type="text" id="matSearch" oninput="selectedMat = null; applyFilters()" placeholder="เช่น 1-00-001-0001 หรือ 1000010001 (คั่นหลายรายการด้วย ,)">
     </div>
     <div>
       <label>🧪 แบทช์</label>
-      <select id="batchFilter" onchange="render()"><option value="ALL">✅ ทั้งหมด</option></select>
+      <select id="batchFilter" onchange="applyFilters()"><option value="ALL">✅ ทั้งหมด</option></select>
     </div>
     <div>
-      <label class="chk-line" style="margin:0;"><input type="checkbox" id="hideZero" onchange="render()"> ซ่อนแถวที่ยอดใช้ได้ = 0</label>
+      <label class="chk-line" style="margin:0;"><input type="checkbox" id="hideZero" onchange="applyFilters()"> ซ่อนแถวที่ยอดใช้ได้ = 0</label>
     </div>
     <div>
       <button class="btn-reset" onclick="resetFilters()">🔄 ล้างตัวกรอง</button>
@@ -142,7 +142,7 @@ tr.mat-band td { background: #f7e6c8; font-weight: bold; border-top: 2px solid #
     </div>
     <div style="display:flex; gap:8px;">
       <button class="btn-export" onclick="exportSum()">📥 Export Excel (.xlsx)</button>
-      <button class="btn-clear-mat" onclick="selectedMat = null; render()">ล้างการเลือกวัสดุ</button>
+      <button class="btn-clear-mat" onclick="selectedMat = null; applyFilters()">ล้างการเลือกวัสดุ</button>
     </div>
   </div>
   <div class="table-wrapper" style="max-height: 340px;">
@@ -206,7 +206,12 @@ const PLANT_NAMES = {
 const BLANK = '__BLANK__';
 const BLANK_LABEL = '(ไม่ระบุที่เก็บ / ระหว่างขนส่ง)';
 
+const SUM_LIMIT = 2000;   // จำกัดแถว HTML ตารางที่ 1 (Export ได้ครบทุกแถว)
+const DET_STEP = 1500;    // จำนวนแถว HTML ตารางที่ 2 ต่อครั้ง (กดแสดงเพิ่มได้)
+
 // ── State ──
+let detLimit = DET_STEP;
+let renderTimer = null;
 let selectedMat = null;
 let exportSumRows = [], exportDetRows = [];
 
@@ -221,6 +226,15 @@ const locKey = l => l === '' ? BLANK : l;
 const locLabel = l => l === '' ? BLANK_LABEL : l;
 const plantOf = r => r.Plant || DEFAULT_PLANT;          // data.js เก่าที่ยังไม่มี Plant = D060
 const plantLabel = p => PLANT_NAMES[p] || p;
+const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;      // เร็วกว่า localeCompare มาก
+// หน่วงการวาดตาราง (รวมการติ๊กหลายครั้งเป็นรอบเดียว) ป้องกันหน้าค้างเมื่อข้อมูลหลายโรงงาน
+function applyFilters() {
+  detLimit = DET_STEP;
+  clearTimeout(renderTimer);
+  document.body.style.cursor = 'progress';
+  renderTimer = setTimeout(() => { try { render(); } finally { document.body.style.cursor = ''; } }, 40);
+}
+function showMoreDet() { detLimit += DET_STEP; render(); }
 
 // ── Init ──
 function init() {
@@ -273,7 +287,7 @@ function plantChanged() {
   buildLocList(true);   // รายการที่เก็บเปลี่ยนตามโรงงานที่เลือก
   updateLocAnchor();
   selectedMat = null;
-  render();
+  applyFilters();
 }
 function plantPreset(kind) {
   document.querySelectorAll('.chk-plant').forEach(c => { c.checked = kind === 'all' ? true : (kind === 'default' ? c.value === DEFAULT_PLANT : false); });
@@ -289,7 +303,7 @@ function buildLocList(keepChecked) {
     if (plants.size && !plants.has(plantOf(r))) return;
     (locMats[r.Loc] = locMats[r.Loc] || new Set()).add(r.Mat);
   });
-  const locs = Object.keys(locMats).sort((a, b) => (a === '') - (b === '') || a.localeCompare(b));
+  const locs = Object.keys(locMats).sort((a, b) => (a === '') - (b === '') || cmp(a, b));
   document.getElementById('locItems').innerHTML = `<div class="tools">
       <button onclick="locPreset('all')">เลือกทั้งหมด</button>
       <button onclick="locPreset('none')">ล้าง</button>
@@ -307,7 +321,7 @@ function updateLocAnchor() {
 function locChanged() {
   updateLocAnchor();
   selectedMat = null;
-  render();
+  applyFilters();
 }
 function locPreset(kind) {
   document.querySelectorAll('.chk-loc').forEach(c => { c.checked = kind === 'all' ? true : (kind === 'demand' ? DEMAND_LOCS.includes(c.value) : false); });
@@ -325,7 +339,7 @@ function resetFilters() {
   buildLocList(false);
   updateLocAnchor();
   selectedMat = null;
-  render();
+  applyFilters();
 }
 
 // ── กรองข้อมูล ──
@@ -366,7 +380,7 @@ function render() {
     if (r.Loc !== '') s.locs.add(plantOf(r) + '|' + r.Loc);
   });
   if (selectedMat && !sum[selectedMat]) selectedMat = null;
-  const mats = Object.values(sum).sort((a, b) => a.mat.localeCompare(b.mat));
+  const mats = Object.values(sum).sort((a, b) => cmp(a.mat, b.mat));
 
   // KPI
   document.getElementById('kMat').innerText = fmt(mats.length);
@@ -377,9 +391,9 @@ function render() {
   // ตารางที่ 1
   let h1 = '';
   const tot = { transit: 0, qi: 0, restr: 0, blocked: 0, ret: 0 };
-  mats.forEach(m => {
+  mats.forEach((m, i) => {
     tot.transit += m.transit; tot.qi += m.qi; tot.restr += m.restr; tot.blocked += m.blocked; tot.ret += m.ret;
-    h1 += `<tr class="${selectedMat === m.mat ? 'selected' : ''}" onclick="selectMat('${m.mat}')">
+    if (i < SUM_LIMIT) h1 += `<tr class="${selectedMat === m.mat ? 'selected' : ''}" onclick="selectMat('${m.mat}')">
       <td class="ctr"><span class="mat-link">${m.mat}</span></td>
       <td>${m.desc}</td>
       <td class="ctr">${m.unit}</td>
@@ -388,6 +402,7 @@ function render() {
       ${numCell(m.transit)}${numCell(m.qi)}${numCell(m.restr)}${numCell(m.blocked)}${numCell(m.ret)}
     </tr>`;
   });
+  if (mats.length > SUM_LIMIT) h1 += `<tr><td colspan="10" style="text-align:center; padding:10px; color:#7f8c8d;">แสดง ${fmt(SUM_LIMIT)} จาก ${fmt(mats.length)} รายการ — เลือกโรงงาน/ประเภทให้แคบลง หรือกด Export Excel เพื่อดูครบทั้งหมด</td></tr>`;
   document.getElementById('sumBody').innerHTML = h1 || '<tr><td colspan="10" style="text-align:center; padding:20px;">ไม่มีข้อมูลที่ตรงกับเงื่อนไข</td></tr>';
   document.getElementById('sumFoot').innerHTML = mats.length ? `<tr><td colspan="3" style="text-align:right;">รวม ${mats.length} รายการวัสดุ (ยอดรวมไม่แสดงเพราะหน่วยนับต่างกัน)</td><td></td><td></td>
     <td class="num-col">${fmt(tot.transit)}</td><td class="num-col">${fmt(tot.qi)}</td><td class="num-col">${fmt(tot.restr)}</td><td class="num-col">${fmt(tot.blocked)}</td><td class="num-col">${fmt(tot.ret)}</td></tr>` : '';
@@ -402,24 +417,33 @@ function render() {
   const byMat = {};
   det.forEach(r => { (byMat[r.Mat] = byMat[r.Mat] || []).push(r); });
   let h2 = '';
+  let htmlRows = 0, hiddenMats = 0;
   exportDetRows = [];
   Object.keys(byMat).sort().forEach(mat => {
-    const g = byMat[mat].slice().sort((a, b) => plantOf(a).localeCompare(plantOf(b)) || (a.Loc === '') - (b.Loc === '') || a.Loc.localeCompare(b.Loc) || a.Batch.localeCompare(b.Batch));
-    const total = g.reduce((s, r) => s + r.Qty, 0);
-    const gPlants = [...new Set(g.map(plantOf))];
-    const plantTxt = gPlants.length === 1 ? plantLabel(gPlants[0]) : gPlants.join(', ');
-    h2 += `<tr class="mat-band"><td colspan="4">${mat} &nbsp; ${g[0].Desc}</td><td class="num-col">${fmt(total)}</td><td colspan="5" style="font-weight:normal; color:#7f8c8d;">${plantTxt} | ${g[0].Category}</td></tr>`;
+    const g = byMat[mat].slice().sort((x, y) => cmp(plantOf(x), plantOf(y)) || ((x.Loc === '') - (y.Loc === '')) || cmp(x.Loc, y.Loc) || cmp(x.Batch, y.Batch));
+    const show = htmlRows < detLimit;
+    if (show) {
+      const total = g.reduce((t, r) => t + r.Qty, 0);
+      const gPlants = [...new Set(g.map(plantOf))];
+      const plantTxt = gPlants.length === 1 ? plantLabel(gPlants[0]) : gPlants.join(', ');
+      h2 += `<tr class="mat-band"><td colspan="4">${mat} &nbsp; ${g[0].Desc}</td><td class="num-col">${fmt(total)}</td><td colspan="5" style="font-weight:normal; color:#7f8c8d;">${plantTxt} | ${g[0].Category}</td></tr>`;
+      htmlRows++;
+    } else hiddenMats++;
     g.forEach(r => {
-      const bt = r.Batch === '' ? '-' : `<span class="tag-b tag-${r.Batch === 'N' || r.Batch === 'R' ? r.Batch : 'O'}">${r.Batch}</span>`;
-      h2 += `<tr><td class="ctr">${plantOf(r)}</td><td class="ctr">${r.Loc === '' ? '<span style="color:#95a5a6;">(ว่าง)</span>' : r.Loc}</td><td class="ctr">${bt}</td><td class="ctr">${r.Unit}</td>
-        ${numCell(r.Qty, 'g')}${numCell(r.Transit)}${numCell(r.QI)}${numCell(r.Restr)}${numCell(r.Blocked)}${numCell(r.Return)}</tr>`;
+      if (show) {
+        const bt = r.Batch === '' ? '-' : `<span class="tag-b tag-${r.Batch === 'N' || r.Batch === 'R' ? r.Batch : 'O'}">${r.Batch}</span>`;
+        h2 += `<tr><td class="ctr">${plantOf(r)}</td><td class="ctr">${r.Loc === '' ? '<span style="color:#95a5a6;">(ว่าง)</span>' : r.Loc}</td><td class="ctr">${bt}</td><td class="ctr">${r.Unit}</td>
+          ${numCell(r.Qty, 'g')}${numCell(r.Transit)}${numCell(r.QI)}${numCell(r.Restr)}${numCell(r.Blocked)}${numCell(r.Return)}</tr>`;
+        htmlRows++;
+      }
       exportDetRows.push([r.Mat, r.Desc, r.Category, plantOf(r), r.Loc === '' ? '(ไม่ระบุที่เก็บ)' : r.Loc, r.Batch, r.Unit, r.Qty, r.Transit, r.QI, r.Restr, r.Blocked, r.Return]);
     });
   });
+  if (hiddenMats) h2 += `<tr><td colspan="10" style="text-align:center; padding:12px;"><button class="btn-export" onclick="showMoreDet()">⬇️ แสดงเพิ่ม (เหลืออีก ${fmt(hiddenMats)} วัสดุ)</button> <span style="color:#7f8c8d; font-size:12px;">หรือกด Export Excel เพื่อดูครบทุกแถว</span></td></tr>`;
   document.getElementById('detBody').innerHTML = h2 || '<tr><td colspan="10" style="text-align:center; padding:20px;">ไม่มีข้อมูลที่ตรงกับเงื่อนไข</td></tr>';
 }
 
-function selectMat(m) { selectedMat = (selectedMat === m) ? null : m; render(); }
+function selectMat(m) { selectedMat = (selectedMat === m) ? null : m; applyFilters(); }
 
 // ── Export Excel ──
 function filterInfo() {
