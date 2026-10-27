@@ -31,20 +31,12 @@
         .nf-box b { color: #c0392b; }
         .nf-list { font-family: Consolas, monospace; font-size: 12.5px; word-break: break-all; margin-top: 4px; }
 
-        .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 14px; }
-        .kpi { border-radius: 10px; padding: 12px 16px; background: #fff; border: 1px solid #e3e8ee; border-left: 6px solid #388e3c; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-        .kpi .k-label { font-size: 12.5px; color: #7f8c8d; font-weight: bold; }
-        .kpi .k-value { font-size: 28px; font-weight: bold; color: #2c3e50; line-height: 1.25; }
-        .kpi .k-sub { font-size: 12px; color: #7f8c8d; }
-        .kpi.blue { border-left-color: #2980b9; } .kpi.blue .k-value { color: #21618c; }
-        .kpi.amber { border-left-color: #f39c12; } .kpi.amber .k-value { color: #d68910; }
-        .kpi.purple { border-left-color: #8e44ad; } .kpi.purple .k-value { color: #7d3c98; }
-
-        .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-        .chips .c-title { font-size: 12.5px; font-weight: bold; color: #7f8c8d; }
-        .chip { background: #fff; border: 1px solid #388e3c; color: #2e7d32; padding: 3px 11px; border-radius: 14px; font-size: 12.5px; font-weight: bold; cursor: pointer; transition: 0.15s; }
-        .chip:hover, .chip.on { background: #388e3c; color: #fff; }
-        .chips.d .chip { border-color: #5c6bc0; color: #3949ab; } .chips.d .chip:hover, .chips.d .chip.on { background: #5c6bc0; color: #fff; }
+        .summary { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; background: linear-gradient(135deg, #e8f5e9, #f1f8e9); border: 1px solid #a5d6a7; border-left: 8px solid #388e3c; border-radius: 10px; padding: 14px 22px; margin-bottom: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .summary .s-icon { font-size: 34px; }
+        .summary .s-label { font-size: 13px; font-weight: bold; color: #558b2f; }
+        .summary .s-num { font-size: 40px; font-weight: bold; color: #1b5e20; line-height: 1.15; }
+        .summary .s-num small { font-size: 18px; font-weight: bold; color: #2e7d32; }
+        .summary .s-sub { font-size: 14px; color: #33691e; margin-left: auto; text-align: right; line-height: 1.6; }
 
         .sec-head { display: flex; justify-content: space-between; align-items: center; margin: 20px 0 8px 0; flex-wrap: wrap; gap: 10px; }
         .sec-head h2 { margin: 0; color: #2c3e50; font-size: 18px; }
@@ -109,15 +101,14 @@
 
         <div class="nf-box" id="nfBox"></div>
 
-        <div class="kpi-row">
-            <div class="kpi"><div class="k-label">⚡ จำนวนเครื่องทั้งหมด (Serial)</div><div class="k-value" id="kTotal">0</div><div class="k-sub" id="kTotalSub">ตามตัวกรอง</div></div>
-            <div class="kpi blue"><div class="k-label">📦 รายการวัสดุ</div><div class="k-value" id="kMat">0</div><div class="k-sub">รหัสวัสดุ</div></div>
-            <div class="kpi amber"><div class="k-label">🏭 ผู้ผลิต</div><div class="k-value" id="kMaker">0</div><div class="k-sub">ราย</div></div>
-            <div class="kpi purple"><div class="k-label">🔌 มิเตอร์ (METER)</div><div class="k-value" id="kMeter">0</div><div class="k-sub">เครื่อง (ไม่รวม CT / VT)</div></div>
+        <div class="summary">
+            <div class="s-icon">⚡</div>
+            <div>
+                <div class="s-label">สรุป: มีทั้งหมด (รวมทุกรายการ)</div>
+                <div class="s-num"><span id="sTotal">0</span> <small>เครื่อง</small></div>
+            </div>
+            <div class="s-sub" id="sSub"></div>
         </div>
-
-        <div class="chips" id="makerChips"></div>
-        <div class="chips d" id="dateChips"></div>
 
         <!-- ตารางที่ 1 -->
         <div class="sec-head">
@@ -133,8 +124,8 @@
         <div class="table-wrapper" style="max-height: 340px;">
             <table>
                 <thead><tr>
-                    <th style="min-width:130px;">รหัสวัสดุ</th><th style="min-width:280px;">คำอธิบายวัสดุ</th><th>ประเภท</th>
-                    <th>ผู้ผลิต</th><th style="background:#388e3c;">จำนวน (เครื่อง)</th><th>ที่เก็บ</th><th>มีผลจาก (เก่าสุด – ใหม่สุด)</th>
+                    <th style="min-width:130px;">รหัสวัสดุ</th><th style="min-width:300px;">คำอธิบายวัสดุ</th>
+                    <th style="background:#388e3c;">จำนวน (เครื่อง)</th><th>ที่เก็บ</th>
                 </tr></thead>
                 <tbody id="sumBody"></tbody>
                 <tfoot id="sumFoot"></tfoot>
@@ -210,7 +201,6 @@
         document.getElementById('searchBox').value = '';
         selectedMat = null; page = 1; render();
     }
-    function setSel(id, v) { const e = document.getElementById(id); e.value = (e.value === v) ? 'ALL' : v; onFilter(); }
 
     function searchTerms() {
         return document.getElementById('searchBox').value.split(/[\s,;]+/).map(t => t.trim()).filter(t => normId(t).length >= 3);
@@ -247,38 +237,24 @@
                 + (missing.length ? `<div class="nf-list">ไม่พบ: ${esc(missing.slice(0, 80).join(', '))}${missing.length > 80 ? ' ...' : ''}</div>` : ' ✅ พบครบทุกรายการ');
         } else nf.style.display = 'none';
 
-        // ----- KPI -----
-        document.getElementById('kTotal').innerText = fmt(rows.length);
-        document.getElementById('kTotalSub').innerText = rows.length === all.length ? 'ทั้งหมดในรายงาน' : 'ตามตัวกรอง (จากทั้งหมด ' + fmt(all.length) + ')';
-        document.getElementById('kMat').innerText = fmt(new Set(rows.map(r => r.Mat)).size);
-        document.getElementById('kMaker').innerText = fmt(new Set(rows.map(r => r.Maker)).size);
-        document.getElementById('kMeter').innerText = fmt(rows.filter(r => r.Type === 'มิเตอร์').length);
-
-        // ----- chips ผู้ผลิต / วันที่ -----
-        const cnt = (arr, key) => { const o = {}; arr.forEach(r => { o[r[key]] = (o[r[key]] || 0) + 1; }); return o; };
-        const mk = cnt(baseFilter('maker'), 'Maker'), curMaker = document.getElementById('makerFilter').value;
-        document.getElementById('makerChips').innerHTML = '<span class="c-title">🏭 ผู้ผลิต:</span>' + Object.keys(mk).sort((a, b) => mk[b] - mk[a])
-            .map(k => `<span class="chip ${curMaker === k ? 'on' : ''}" onclick="setSel('makerFilter', '${k.replace(/'/g, "\\'")}')">${esc(k)} : ${fmt(mk[k])}</span>`).join('');
-        const dt = cnt(baseFilter('date'), 'Date'), curDate = document.getElementById('dateFilter').value;
-        document.getElementById('dateChips').innerHTML = '<span class="c-title">📅 มีผลจาก:</span>' + Object.keys(dt).sort((a, b) => dateKey(b).localeCompare(dateKey(a)))
-            .map(k => `<span class="chip ${curDate === k ? 'on' : ''}" onclick="setSel('dateFilter', '${k}')">${k} : ${fmt(dt[k])}</span>`).join('');
+        // ----- สรุปจำนวนเครื่องรวมทั้งหมด -----
+        const nMat = new Set(rows.map(r => r.Mat)).size;
+        document.getElementById('sTotal').innerText = fmt(rows.length);
+        document.getElementById('sSub').innerHTML = 'จาก <b>' + fmt(nMat) + '</b> รายการวัสดุ' + (rows.length === all.length ? '<br>ทั้งหมดในรายงาน' : '<br>ตามตัวกรอง (จากทั้งหมด ' + fmt(all.length) + ' เครื่อง)');
 
         // ----- ตารางที่ 1 -----
         const sum = {};
         rows.forEach(r => {
-            const s = sum[r.Mat] = sum[r.Mat] || { mat: r.Mat, desc: r.Desc, type: r.Type, makers: new Set(), locs: new Set(), n: 0, d1: r.DK, d2: r.DK, t1: r.Date, t2: r.Date };
-            s.n++; s.makers.add(r.Maker); s.locs.add(locLabel(r.Loc));
-            if (r.DK && (!s.d1 || r.DK < s.d1)) { s.d1 = r.DK; s.t1 = r.Date; }
-            if (r.DK && r.DK > s.d2) { s.d2 = r.DK; s.t2 = r.Date; }
+            const s = sum[r.Mat] = sum[r.Mat] || { mat: r.Mat, desc: r.Desc, locs: new Set(), n: 0 };
+            s.n++; s.locs.add(locLabel(r.Loc));
         });
         if (selectedMat && !sum[selectedMat]) selectedMat = null;
         const mats = Object.values(sum).sort((a, b) => a.mat.localeCompare(b.mat));
         document.getElementById('sumBody').innerHTML = mats.map(m => `<tr class="${selectedMat === m.mat ? 'selected' : ''}" onclick="selectMat('${m.mat}')">
-            <td class="ctr"><span class="mat-link">${m.mat}</span></td><td>${esc(m.desc)}</td><td class="ctr"><span class="tag ${tagCls(m.type)}">${m.type}</span></td>
-            <td>${esc([...m.makers].join(', '))}</td><td class="num-col"><b>${fmt(m.n)}</b></td><td class="ctr">${[...m.locs].join(', ')}</td>
-            <td class="ctr">${m.t1 === m.t2 ? m.t1 : m.t1 + ' – ' + m.t2}</td></tr>`).join('') || '<tr><td colspan="7" style="text-align:center; padding:20px;">ไม่มีข้อมูลที่ตรงกับเงื่อนไข</td></tr>';
-        document.getElementById('sumFoot').innerHTML = mats.length ? `<tr><td colspan="4" style="text-align:right;">รวม ${mats.length} รายการวัสดุ</td><td class="num-col">${fmt(rows.length)}</td><td colspan="2"></td></tr>` : '';
-        exportSumRows = mats.map(m => [m.mat, m.desc, m.type, [...m.makers].join(', '), m.n, [...m.locs].join(', '), m.t1 === m.t2 ? m.t1 : m.t1 + ' – ' + m.t2]);
+            <td class="ctr"><span class="mat-link">${m.mat}</span></td><td>${esc(m.desc)}</td>
+            <td class="num-col"><b>${fmt(m.n)}</b></td><td class="ctr">${[...m.locs].join(', ')}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center; padding:20px;">ไม่มีข้อมูลที่ตรงกับเงื่อนไข</td></tr>';
+        document.getElementById('sumFoot').innerHTML = mats.length ? `<tr><td colspan="2" style="text-align:right;">รวมทั้งหมด ${fmt(mats.length)} รายการวัสดุ</td><td class="num-col">${fmt(rows.length)} เครื่อง</td><td></td></tr>` : '';
+        exportSumRows = mats.map(m => [m.mat, m.desc, m.n, [...m.locs].join(', ')]);
 
         const chip = document.getElementById('selChip');
         if (selectedMat) { chip.style.display = 'inline-block'; chip.innerText = '🔎 กำลังกรองวัสดุ: ' + selectedMat; } else chip.style.display = 'none';
@@ -318,9 +294,9 @@
         XLSX.writeFile(wb, prefix + '_' + new Date().toISOString().slice(0, 10) + '.xlsx');
     }
     function exportSum() {
-        saveAoa([['มิเตอร์ : สรุปตามรายการวัสดุ (ตารางที่ 1)'], [filterInfo(), '', '', '', '', '', asOfTxt()], [],
-            ['รหัสวัสดุ', 'คำอธิบายวัสดุ', 'ประเภท', 'ผู้ผลิต', 'จำนวน (เครื่อง)', 'ที่เก็บ', 'มีผลจาก'], ...exportSumRows,
-            ['', 'รวม', '', '', exportSumRows.reduce((a, r) => a + r[4], 0), '', '']], [18, 48, 22, 22, 16, 12, 24], 'สรุป', 'Meter_Summary');
+        saveAoa([['มิเตอร์ : สรุปตามรายการวัสดุ (ตารางที่ 1)'], [filterInfo(), '', '', asOfTxt()], [],
+            ['รหัสวัสดุ', 'คำอธิบายวัสดุ', 'จำนวน (เครื่อง)', 'ที่เก็บ'], ...exportSumRows,
+            ['', 'รวมทั้งหมด', exportSumRows.reduce((a, r) => a + r[2], 0), '']], [18, 52, 16, 12], 'สรุป', 'Meter_Summary');
     }
     function exportDet() {
         saveAoa([['มิเตอร์ : รายการ Serial Number (ตารางที่ 2)'], [filterInfo(), '', '', '', '', '', '', '', '', asOfTxt()], [],
